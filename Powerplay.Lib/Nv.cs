@@ -1,7 +1,7 @@
 ﻿using System.IO.MemoryMappedFiles;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using Flurl.Http;
 
 namespace Powerplay.Lib;
@@ -159,29 +159,12 @@ public class Nv
 			},
 		};
 
+		InstantReplay = new InstantReplay(Client);
+
 	}
 
 	public Nv() : this(GetConfig()) { }
 
-}
-
-public readonly struct NvServerConfig
-{
-
-	public long Port { get; }
-
-	public string Secret { get; }
-
-	[JsonConstructor]
-	public NvServerConfig(long port, string secret)
-	{
-		Port   = port;
-		Secret = secret;
-	}
-
-	public override string ToString()
-	{
-		return $"{nameof(Port)}: {Port} | {nameof(Secret)}: {Secret}";
-	}
+	public InstantReplay InstantReplay { get; }
 
 }
