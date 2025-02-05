@@ -1,147 +1,54 @@
 ﻿// Author: Deci | Project: Powerplay.Lib | Name: AppController.cs
 // Date: 2025/02/05 @ 14:02:37
 
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using Novus.Win32;
+using Novus.Win32.Structures.AdvApi32;
 
 namespace Powerplay.Lib.App;
 
 // Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
-public class NvApplication
+
+public class NvServiceController : IDisposable
 {
 
-	[JsonPropertyName("LocalId")]
-	public int LocalId { get; set; }
+	public const string SVC_LOCAL_CONTAINER = "NvContainerLocalSystem";
 
-	[JsonPropertyName("Application")]
-	public NvApplicationEntry Application { get; set; }
 
-}
+	public static bool Control(string svcName, ServiceControl svcCode, out ServiceStatus ss)
+	{
+		bool ok = true;
+		ss = default;
+		ok = Control<bool>(svcName, (ScHandle hScManager) => Native.ControlService(hScManager, svcCode, out ss));
 
-public class NvApplicationEntry
-{
+		return ok;
+	}
 
-	[JsonPropertyName("CmsId")]
-	public int CmsId { get; set; }
+	public static T Control<T>(string svcName, Func<ScHandle, T> fn)
+	{
+		T   ret        = default;
+		var hScManager = Native.OpenSCManager(null, null, ScManagerAccessTypes.SC_MANAGER_ALL_ACCESS);
 
-	[JsonPropertyName("CmsVersion")]
-	public int CmsVersion { get; set; }
 
-	[JsonPropertyName("DisplayName")]
-	public string DisplayName { get; set; }
+		if (!hScManager.IsNull) {
+			var hSc = Native.OpenService(hScManager, svcName, ServiceAccessTypes.SERVICE_ALL_ACCESS);
 
-	[JsonPropertyName("ShortName")]
-	public string ShortName { get; set; }
+			ret = fn(hScManager);
 
-	[JsonPropertyName("Version")]
-	public string Version { get; set; }
+			Native.CloseServiceHandle(hScManager);
+			Native.CloseServiceHandle(hSc);
+		}
 
-	[JsonPropertyName("Distributor")]
-	public string Distributor { get; set; }
+		return ret;
+	}
 
-	[JsonPropertyName("InstallDirectory")]
-	public string InstallDirectory { get; set; }
+	#region Implementation of IDisposable
 
-	[JsonPropertyName("DetectedFiles")]
-	public List<string> DetectedFiles { get; set; }
+	public void Dispose() { }
 
-	[JsonPropertyName("ImageFiles")]
-	public List<string> ImageFiles { get; set; }
-
-	[JsonPropertyName("LaunchCmd")]
-	public string LaunchCmd { get; set; }
-
-	[JsonPropertyName("IsOpsSupported")]
-	public bool IsOpsSupported { get; set; }
-
-	[JsonPropertyName("UseDesktopResolution")]
-	public bool UseDesktopResolution { get; set; }
-
-	[JsonPropertyName("UseLowResolutions")]
-	public bool UseLowResolutions { get; set; }
-
-	[JsonPropertyName("HypersamplingQuality")]
-	public int HypersamplingQuality { get; set; }
-
-	[JsonPropertyName("HypersamplingFactors")]
-	public List<int> HypersamplingFactors { get; set; }
-
-	[JsonPropertyName("IsStreamingSupported")]
-	public bool IsStreamingSupported { get; set; }
-
-	[JsonPropertyName("StreamingCmdLine")]
-	public string StreamingCmdLine { get; set; }
-
-	[JsonPropertyName("StreamingCaption")]
-	public string StreamingCaption { get; set; }
-
-	[JsonPropertyName("StreamingClassName")]
-	public string StreamingClassName { get; set; }
-
-	[JsonPropertyName("StreamingAutomatedLaunch")]
-	public bool StreamingAutomatedLaunch { get; set; }
-
-	[JsonPropertyName("DriverProfile")]
-	public string DriverProfile { get; set; }
-
-	[JsonPropertyName("IsCreativeApplication")]
-	public bool IsCreativeApplication { get; set; }
-
-	[JsonPropertyName("SendTelemetryForGFESupportedApps")]
-	public bool SendTelemetryForGFESupportedApps { get; set; }
-
-	[JsonPropertyName("UseDRSForTelemetry")]
-	public bool UseDRSForTelemetry { get; set; }
-
-	[JsonPropertyName("ChromaAppId")]
-	public string ChromaAppId { get; set; }
-
-	[JsonPropertyName("InitialTimeISO")]
-	public DateTime InitialTimeISO { get; set; }
-
-	[JsonPropertyName("LastLaunchTimeISO")]
-	public DateTime LastLaunchTimeISO { get; set; }
-
-	[JsonPropertyName("IsManuallyAdded")]
-	public bool IsManuallyAdded { get; set; }
-
-	[JsonPropertyName("IsFingerprintDetected")]
-	public bool IsFingerprintDetected { get; set; }
-
-	[JsonPropertyName("Disable_FG_Override")]
-	public bool Disable_FG_Override { get; set; }
-
-	[JsonPropertyName("Disable_RR_Override")]
-	public bool Disable_RR_Override { get; set; }
-
-	[JsonPropertyName("Disable_SR_Override")]
-	public bool Disable_SR_Override { get; set; }
-
-	[JsonPropertyName("Disable_RR_Model_Override")]
-	public bool Disable_RR_Model_Override { get; set; }
-
-	[JsonPropertyName("Disable_SR_Model_Override")]
-	public bool Disable_SR_Model_Override { get; set; }
-
-	[JsonPropertyName("QuietModePopsFactor")]
-	public double? QuietModePopsFactor { get; set; }
-
-	[JsonPropertyName("BatteryBoost2PopsFactorTPPLow")]
-	public double? BatteryBoost2PopsFactorTPPLow { get; set; }
-
-	[JsonPropertyName("BatteryBoost2PopsFactorTPPHigh")]
-	public double? BatteryBoost2PopsFactorTPPHigh { get; set; }
-
-	[JsonPropertyName("UwpPackageFamilyName")]
-	public string UwpPackageFamilyName { get; set; }
-
-}
-
-public class NvAppApplicationsRoot
-{
-
-	[JsonPropertyName("Applications")]
-	public List<NvApplication> Applications { get; set; }
+	#endregion
 
 }
 
@@ -176,10 +83,10 @@ public class AppController
 	public static readonly string NvidiaAppBackend;
 	public static readonly string NvidiaAppSettings;
 
-	public async Task<NvAppApplicationsRoot> Applications()
+	public NvAppSettings Applications()
 	{
-		var fs = File.OpenRead(NvidiaAppSettings);
-		var obj = JsonSerializer.Deserialize<NvAppApplicationsRoot>(fs);
+		using var fs  = File.OpenRead(NvidiaAppSettings);
+		var       obj = JsonSerializer.Deserialize<NvAppSettings>(fs);
 
 		return obj;
 	}
