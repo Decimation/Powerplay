@@ -3,7 +3,7 @@
 
 using Flurl.Http;
 
-namespace Powerplay.Lib;
+namespace Powerplay.Lib.Legacy.Shadowplay;
 
 public abstract class BaseEndpoint
 {
@@ -15,7 +15,7 @@ public abstract class BaseEndpoint
 	public BaseEndpoint(FlurlClient client, string segment)
 	{
 		Segment = segment;
-		Client  = client;
+		Client = client;
 	}
 
 	public virtual IFlurlRequest Setup(string urlSegments)
