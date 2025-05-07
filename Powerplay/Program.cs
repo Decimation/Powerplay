@@ -22,13 +22,34 @@ public static class Program
 		var ap   = new AppController();
 		var apps = ap.Applications();
 
-		NvServiceController.Control(NvServiceController.SVC_LOCAL_CONTAINER, ServiceControl.SERVICE_CONTROL_STOP,
+		Console.WriteLine(AppController.NvidiaAppSettings);
+
+		
+
+		/*NvServiceController.Control(NvServiceController.SVC_LOCAL_CONTAINER, ServiceControl.SERVICE_CONTROL_STOP,
 		                            out ServiceStatus ss);
 
 		Console.WriteLine(ss.dwCurrentState);
 
 		// await Task.Delay(Timeout.Infinite);
-		Console.ReadLine();
+		Console.ReadLine();*/
+
+		var ok = NvServiceController.NvContainer.Open();
+		Console.WriteLine($"{ok}");
+
+		
+
+		ok = NvServiceController.NvContainer.Stop(out ServiceStatus status);
+		Console.WriteLine($"{ok} {status}");
+
+		apps.Applications.RemoveAll(p => p.Application.DisplayName.Contains("DaVinci"));
+		ap.Applications(apps);
+
+		Console.ReadKey();
+
+		ok = NvServiceController.NvContainer.Start();
+		Console.WriteLine($"{ok}");
+		Console.ReadKey();
 	}
 
 }

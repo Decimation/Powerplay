@@ -4,6 +4,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Novus.Win32;
 using Novus.Win32.Structures.AdvApi32;
 
@@ -11,52 +12,19 @@ namespace Powerplay.Lib.App;
 
 // Root myDeserializedClass = JsonSerializer.Deserialize<Root>(myJsonResponse);
 
-public class NvServiceController : IDisposable
-{
-
-	public const string SVC_LOCAL_CONTAINER = "NvContainerLocalSystem";
-
-
-	public static bool Control(string svcName, ServiceControl svcCode, out ServiceStatus ss)
-	{
-		bool ok = true;
-		ss = default;
-		ok = Control<bool>(svcName, (ScHandle hScManager) => Native.ControlService(hScManager, svcCode, out ss));
-
-		return ok;
-	}
-
-	public static T Control<T>(string svcName, Func<ScHandle, T> fn)
-	{
-		T   ret        = default;
-		var hScManager = Native.OpenSCManager(null, null, ScManagerAccessTypes.SC_MANAGER_ALL_ACCESS);
-
-
-		if (!hScManager.IsNull) {
-			var hSc = Native.OpenService(hScManager, svcName, ServiceAccessTypes.SERVICE_ALL_ACCESS);
-
-			ret = fn(hScManager);
-
-			Native.CloseServiceHandle(hScManager);
-			Native.CloseServiceHandle(hSc);
-		}
-
-		return ret;
-	}
-
-	#region Implementation of IDisposable
-
-	public void Dispose() { }
-
-	#endregion
-
-}
-
 public class AppController
 {
 
 	static AppController()
 	{
+		LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(cfg =>
+		{
+			cfg.AddTraceSource("TRACE")
+				.AddDebug()
+				.SetMinimumLevel(LogLevel.Trace);
+		});
+
+
 		var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
 		NvidiaRootDirectory = TryGetDirectory(localAppData, "NVIDIA Corporation");
@@ -64,8 +32,9 @@ public class AppController
 		NvidiaAppBackend    = TryGetDirectory(NvidiaAppDirectory, "NvBackend");
 		NvidiaAppSettings   = TryGetDirectory(NvidiaAppBackend, "ApplicationStorage.json");
 
-
 	}
+
+	internal static readonly ILoggerFactory LoggerFactory;
 
 	private static string TryGetDirectory(params string[] segments)
 	{
@@ -83,12 +52,22 @@ public class AppController
 	public static readonly string NvidiaAppBackend;
 	public static readonly string NvidiaAppSettings;
 
+
 	public NvAppSettings Applications()
 	{
-		using var fs  = File.OpenRead(NvidiaAppSettings);
-		var       obj = JsonSerializer.Deserialize<NvAppSettings>(fs);
+		using var fs = File.OpenRead(NvidiaAppSettings);
+
+		var obj = JsonSerializer.Deserialize<NvAppSettings>(fs);
 
 		return obj;
+	}
+
+	public void Applications(NvAppSettings settings)
+	{
+		using var fs = File.OpenWrite(NvidiaAppSettings);
+
+		JsonSerializer.Serialize(fs, settings);
+
 	}
 
 }
